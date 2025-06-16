@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Mobil - CarsHub</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Detail & Booking Mobil</h1>
+    </header>
+
+    <main>
+        <div id="car-detail-container">
+            <p>Memuat detail mobil...</p>
+        </div>
+
+        <hr style="margin: 2rem 0;">
+
+        <h2>Formulir Booking</h2>
+        <form id="booking-form">
+            <div>
+                <label for="tanggal_mulai">Tanggal Mulai Sewa:</label>
+                <input type="date" id="tanggal_mulai" name="tanggal_mulai" required>
+            </div>
+            <br>
+            <div>
+                <label for="tanggal_selesai">Tanggal Selesai Sewa:</label>
+                <input type="date" id="tanggal_selesai" name="tanggal_selesai" required>
+            </div>
+            <br>
+            <button type="submit">Booking Sekarang</button>
+        </form>
+    </main>
+
+    <script src="detail.js"></script>
+</body>
+</html>

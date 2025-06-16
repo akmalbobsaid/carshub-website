@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - CarsHub</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Menggunakan style toggle yang sama dari halaman login/register */
+        .form-container { max-width: 1400px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-toggle { display: flex; justify-content: center; margin-bottom: 2rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .toggle-btn { flex: 1; padding: 1rem; border: none; background: #f9f9f9; cursor: pointer; font-size: 1rem; transition: background 0.3s; }
+        .toggle-btn.active { background: #007bff; color: white; }
+        
+        /* Style untuk menyembunyikan/menampilkan tabel */
+        .admin-view {
+            display: none;
+        }
+        .admin-view.active {
+            display: block;
+        }
+        
+        /* Style untuk tabel (tetap sama) */
+        table, th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .action-button { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; color: white; margin-right: 5px; }
+        .btn-verify { background-color: #007bff; }
+        .btn-complete { background-color: #28a745; }
+        .btn-approve { background-color: #28a745; }
+        .btn-reject { background-color: #dc3545; }
+        .action-button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Admin Dashboard</h1>
+    </header>
+
+    <main>
+        <div class="form-container">
+            <!-- [BAGIAN BARU] Tombol Toggle -->
+            <div class="form-toggle">
+                <button id="bookings-toggle" class="toggle-btn active">Manajemen Pesanan</button>
+                <button id="verification-toggle" class="toggle-btn">Verifikasi Mobil</button>
+            </div>
+
+            <!-- [BAGIAN BARU] Kontainer untuk setiap tampilan tabel -->
+            
+            <!-- Tampilan Manajemen Pesanan -->
+            <div id="bookings-view" class="admin-view active">
+                <h2>Manajemen Pesanan Pelanggan</h2>
+                <div style="overflow-x:auto;">
+                    <table id="bookings-table" style="width:100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th>ID Booking</th>
+                                <th>Pelanggan</th>
+                                <th>Mobil</th>
+                                <th>Tanggal Mulai</th>
+                                <th>Tanggal Selesai</th>
+                                <th>Status</th>
+                                <th>Bukti Bayar</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookings-tbody">
+                            <tr><td colspan="8">Memuat data pesanan...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tampilan Verifikasi Mobil -->
+            <div id="verification-view" class="admin-view">
+                <h2>Verifikasi Pendaftaran Mobil</h2>
+                <p>Setujui atau tolak mobil yang diajukan oleh supplier.</p>
+                <div style="overflow-x:auto;">
+                    <table id="verification-table" style="width:100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th>ID Daftar</th>
+                                <th>Supplier</th>
+                                <th>Merk & Tipe</th>
+                                <th>Tahun</th>
+                                <th>Tarif/Hari</th>
+                                <th>Foto</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-cars-tbody">
+                            <tr><td colspan="7">Memuat data verifikasi...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="admin.js"></script>
+</body>
+</html>
