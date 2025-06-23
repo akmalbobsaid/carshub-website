@@ -10,37 +10,61 @@
 </head>
 <body>
     <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo">
-                <i class="fas fa-car"></i>
-                CarsHub
-            </a>
-            <ul class="nav-links">
-                <li><a href="#home">Beranda</a></li>
-                <li><a href="#cars">Mobil</a></li>
-                <li><a href="#about">Tentang</a></li>
-                <li><a href="#contact">Kontak</a></li>
-            </ul>
-            <div class="nav-auth">
-                <a href="login.html" class="btn btn-outline">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Masuk
+    <header>
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <i class="fas fa-car"></i>
+                    CarsHub
                 </a>
-                <a href="register.html" class="btn btn-primary">
-                    <i class="fas fa-user-plus"></i>
-                    Daftar
-                </a>
+                <ul class="nav-links">
+                    <li><a href="#home">Beranda</a></li>
+                    <li><a href="#cars">Mobil</a></li>
+                    <li><a href="#about">Tentang</a></li>
+                    <li><a href="#contact">Kontak</a></li>
+                </ul>
+                <div class="nav-links">
+                    <div id="auth-links">
+                        <a href="login.html" class="btn btn-outline">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Masuk
+                        </a>
+                        <a href="register.html" class="btn btn-primary">
+                            <i class="fas fa-user-plus"></i>
+                            Daftar
+                        </a>
+                    </div>
+                    <div id="user-info">
+                        <span id="user-name"></span>
+                        <button id="logout-button" class="btn btn-danger">Logout</button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </nav>
+        </nav>
+    </header>
+
+    <!--<header>
+        <nav>
+            <a href="index.html" class="logo">CarsHub</a>
+            <div class="nav-links">
+                <div id="auth-links">
+                    <a href="login.html">Masuk</a>
+                    <a href="register.html" class="btn">Daftar</a>
+                </div>
+                <div id="user-info">
+                    <span id="user-name"></span>
+                    <button id="logout-button" class="btn btn-danger">Logout</button>
+                </div>
+            </div>
+        </nav>
+    </header>-->
 
     <!-- Hero Section -->
     <section class="hero" id="home">
         <div class="hero-content">
             <h1>Sewa Mobil Premium</h1>
             <p>Temukan pengalaman berkendara terbaik dengan koleksi mobil premium kami. Aman, nyaman, dan terpercaya.</p>
-            
+
             <div class="hero-stats">
                 <div class="stat-item">
                     <span class="stat-number">500+</span>
@@ -95,7 +119,7 @@
                 <h2 class="section-title">Pilihan Mobil Terbaik</h2>
                 <p class="section-subtitle">Koleksi mobil premium dengan kondisi prima dan harga terjangkau untuk semua kebutuhan perjalanan Anda</p>
             </div>
-            
+
             <div id="cars-container" class="cars-grid">
                 <!-- Loading state -->
                 <div class="loading-state" id="loading-state">
@@ -107,5 +131,6 @@
     </section>
 
     <script src="script.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>

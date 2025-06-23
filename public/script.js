@@ -26,70 +26,90 @@ async function fetchAndDisplayCars() {
 
     try {
         const response = await fetch('/api/mobil');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const cars = await response.json();
 
-        // Remove loading state
+        // Hapus status loading
         loadingState.remove();
 
         if (cars.length === 0) {
             carsContainer.innerHTML = `
-                        <div class="empty-state">
-                            <i class="fas fa-car empty-icon"></i>
-                            <h3>Belum Ada Mobil Tersedia</h3>
-                            <p>Maaf, saat ini belum ada mobil yang tersedia untuk disewa.</p>
-                        </div>
-                    `;
+                <div class="empty-state">
+                    <i class="fas fa-car empty-icon"></i>
+                    <h3>Belum Ada Mobil Tersedia</h3>
+                    <p>Maaf, saat ini belum ada mobil yang tersedia untuk disewa.</p>
+                </div>
+            `;
             return;
         }
 
-        // Clear container
+        // Kosongkan kontainer
         carsContainer.innerHTML = '';
 
-        // Create car cards
+        // Buat kartu mobil
         cars.forEach((car, index) => {
             const carCard = document.createElement('a');
             carCard.href = `detail.html?id=${car.id_mobil}`;
             carCard.className = 'car-card';
             carCard.style.animationDelay = `${index * 0.1}s`;
 
-            const imageUrl = car.foto || 'https://images.unsplash.com/photo-1494905998402-395d579af36f?w=400&h=240&fit=crop&auto=format';
+            const imageUrl = car.foto || '';
+            const fallbackImageUrl = '';
 
+            // Menggunakan innerHTML tanpa event handler
             carCard.innerHTML = `
-                        <img src="${imageUrl}" alt="${car.merk} ${car.tipe}" class="car-image" 
-                             onerror="this.src='https://images.unsplash.com/photo-1494905998402-395d579af36f?w=400&h=240&fit=crop&auto=format'">
-                        <div class="car-content">
-                            <h3 class="car-title">${car.merk} ${car.tipe}</h3>
-                            <p class="car-year">Tahun ${car.tahun}</p>
-                            
-                            <div class="car-footer">
-                                <div class="car-price">
-                                    Rp ${new Intl.NumberFormat('id-ID').format(car.tarif_per_hari)}
-                                    <span class="price-unit">/ hari</span>
-                                </div>
-                                <div class="availability-badge">
-                                    <i class="fas fa-check-circle"></i>
-                                    Tersedia
-                                </div>
-                            </div>
+                <img src="${imageUrl}" alt="${car.merk} ${car.tipe}" class="car-image">
+                <div class="car-content">
+                    <h3 class="car-title">${car.merk} ${car.tipe}</h3>
+                    <p class="car-year">Tahun ${car.tahun}</p>
+                    <div class="car-footer">
+                        <div class="car-price">
+                            Rp ${new Intl.NumberFormat('id-ID').format(car.tarif_per_hari)}
+                            <span class="price-unit">/ hari</span>
                         </div>
-                    `;
+                        <div class="availability-badge">
+                            <i class="fas fa-check-circle"></i>
+                            Tersedia
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // === PERBAIKAN UNTUK 'onerror' ===
+            const carImage = carCard.querySelector('.car-image');
+            carImage.addEventListener('error', function () {
+                // Jika gambar gagal dimuat, ganti dengan gambar fallback
+                this.src = fallbackImageUrl;
+            });
 
             carsContainer.appendChild(carCard);
         });
 
     } catch (error) {
         console.error('Error fetching cars:', error);
+
+        // Menggunakan innerHTML tanpa event handler
         loadingState.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-exclamation-triangle empty-icon" style="color: var(--danger-color);"></i>
-                        <h3>Gagal Memuat Data</h3>
-                        <p>Terjadi kesalahan saat memuat data mobil. Silakan coba lagi nanti.</p>
-                        <button class="btn btn-primary" onclick="location.reload()">
-                            <i class="fas fa-redo"></i>
-                            Muat Ulang
-                        </button>
-                    </div>
-                `;
+            <div class="empty-state">
+                <i class="fas fa-exclamation-triangle empty-icon" style="color: var(--danger-color);"></i>
+                <h3>Gagal Memuat Data</h3>
+                <p>Terjadi kesalahan saat memuat data mobil. Silakan coba lagi nanti.</p>
+                <button class="btn btn-primary" id="reload-button">
+                    <i class="fas fa-redo"></i>
+                    Muat Ulang
+                </button>
+            </div>
+        `;
+
+        // === PERBAIKAN UNTUK 'onclick' ===
+        const reloadButton = document.getElementById('reload-button');
+        if (reloadButton) {
+            reloadButton.addEventListener('click', () => {
+                location.reload();
+            });
+        }
     }
 }
 

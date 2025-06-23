@@ -1,6 +1,5 @@
-<!-- public/pembayaran.html -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,23 +8,45 @@
 </head>
 <body>
     <header>
-        <h1>Konfirmasi Pembayaran Anda</h1>
+        <nav>
+            <a href="index.html" class="logo">CarsHub</a>
+            <div class="nav-links">
+                <div id="auth-links">
+                    <a href="login.html">Masuk</a>
+                    <a href="register.html" class="btn">Daftar</a>
+                </div>
+                <div id="user-info">
+                    <span id="user-name"></span>
+                    <button id="logout-button" class="btn btn-danger">Logout</button>
+                </div>
+            </div>
+        </nav>
     </header>
-    <main>
-        <div id="payment-details" style="max-width: 600px; margin: 2rem auto; padding: 1.5rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-            <h2>Ringkasan Pesanan</h2>
-            <div id="booking-summary"><p>Memuat ringkasan...</p></div>
-            <hr>
-            <form id="payment-form">
-                <h3>Unggah Bukti Pembayaran</h3>
-                <p>Silakan transfer ke rekening <strong>BCA 123-456-7890 a/n PT CarsHub Indonesia</strong> dan unggah bukti transfer di bawah ini.</p>
-                
-                <input type="file" id="bukti_pembayaran" name="bukti_pembayaran" accept="image/*" required>
-                
-                <button type="submit" style="margin-top: 1rem; width: 100%; padding: 10px;">Konfirmasi Pembayaran</button>
-            </form>
-        </div>
+
+    <main class="main-container">
+        <h2>Formulir Pembayaran</h2>
+        <form id="payment-form" enctype="multipart/form-data">
+            <input type="hidden" id="id_booking" name="id_booking">
+
+            <label for="metode">Metode Pembayaran:</label>
+            <select id="metode" name="metode" required>
+                <option value="transfer_bank">Transfer Bank</option>
+                <option value="kartu_kredit">Kartu Kredit</option>
+                <option value="e-wallet">E-Wallet</option>
+            </select>
+
+            <label for="bukti_pembayaran">Upload Bukti Pembayaran:</label>
+            <input type="file" id="bukti_pembayaran" name="bukti_pembayaran" accept="image/*" required>
+
+            <button type="submit" class="btn btn-success">Bayar Sekarang</button>
+        </form>
     </main>
+
+    <footer>
+        <p>&copy; 2024 CarsHub. All rights reserved.</p>
+    </footer>
+
     <script src="pembayaran.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>

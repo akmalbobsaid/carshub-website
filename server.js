@@ -1,571 +1,251 @@
-﻿// server.js - Versi Optimal dengan Database Pool dan Security (FIXED)
+﻿// server.js - Versi Lengkap dengan Rute untuk Admin
 
-// 1. Load Environment Variables
-require('dotenv').config();
-
-// 2. Import Dependencies
 const express = require('express');
-const mysql = require('mysql2/promise');
-const cors = require('cors');
-const multer = require('multer');
+const mysql = require('mysql2');
+const bodyParser = require('body-parser');
 const path = require('path');
-const bcrypt = require('bcrypt');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
+const multer = require('multer');
+const session = require('express-session');
 
-// 3. Initialize Express App
 const app = express();
-const PORT = process.env.PORT || 3000;
-const SALT_ROUNDS = 12;
+const port = 3000;
 
-// 4. Security Middleware
-app.use(helmet());
-app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-    credentials: true
-}));
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: 'Terlalu banyak permintaan dari IP ini, coba lagi nanti.'
-});
-app.use('/api/', limiter);
-
-// Auth rate limiting (lebih ketat)
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 login attempts per windowMs
-    message: 'Terlalu banyak percobaan login, coba lagi dalam 15 menit.'
-});
-
-// 5. Body Parser Middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// 6. Static Files Middleware
+// Middleware
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// 7. Database Connection Pool (FIXED CONFIGURATION)
-const dbPool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'CarsHub',
-    connectionLimit: 20,
-    queueLimit: 0,
-    // REMOVED INVALID OPTIONS:
-    // acquireTimeout, timeout, reconnect are not valid for mysql2
-    charset: 'utf8mb4',
-    supportBigNumbers: true,
-    bigNumberStrings: true,
-    dateStrings: false,
-    debug: false,
-    multipleStatements: false,
-    // Valid mysql2 options:
-    idleTimeout: 60000,
-    acquireTimeout: 60000,
-    waitForConnections: true,
-    reconnect: true
+app.use(session({
+    secret: 'secret-key-carshub',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false }
+}));
+
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'CarsHub'
 });
 
-// Test database connection
-dbPool.getConnection()
-    .then(connection => {
-        console.log('✅ Database connected successfully');
-        connection.release();
-    })
-    .catch(err => {
-        console.error('❌ Database connection failed:', err.message);
-        process.exit(1);
-    });
+db.connect(err => {
+    if (err) {
+        console.error('Error connecting to database:', err);
+        return;
+    }
+    console.log('Connected to database');
+});
 
-// 8. Multer Configuration
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'public/uploads/');
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    destination: (req, file, cb) => cb(null, 'public/uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+});
+const upload = multer({ storage: storage });
+
+// --- RUTE API UMUM ---
+
+app.get('/api/session', (req, res) => {
+    if (req.session.user) {
+        res.json({ loggedIn: true, user: req.session.user });
+    } else {
+        res.json({ loggedIn: false });
     }
 });
 
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB limit
-    },
-    fileFilter: (req, file, cb) => {
-        // Only allow image files
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Hanya file gambar yang diperbolehkan!'), false);
-        }
-    }
+app.post('/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) return res.status(500).send('Could not log out.');
+        res.clearCookie('connect.sid');
+        res.status(200).json({ success: true, message: 'Logged out successfully' });
+    });
 });
 
-// 9. Helper Functions
-const asyncHandler = (fn) => (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-};
-
-const validateRequired = (fields) => (req, res, next) => {
-    const missing = fields.filter(field => !req.body[field]);
-    if (missing.length > 0) {
-        return res.status(400).json({
-            message: `Field berikut diperlukan: ${missing.join(', ')}`
-        });
+app.post('/register', (req, res) => {
+    const { role, nama, alamat, no_telp, email, password, nik, no_rekening } = req.body;
+    let tableName, fields, values;
+    switch (role) {
+        case 'pelanggan':
+            tableName = 'pelanggan';
+            fields = ['nik', 'nama', 'alamat', 'no_telp', 'email', 'password'];
+            values = [nik, nama, alamat, no_telp, email, password];
+            break;
+        case 'supplier':
+            tableName = 'supplier';
+            fields = ['nama', 'alamat', 'no_telp', 'email', 'password', 'no_rekening'];
+            values = [nama, alamat, no_telp, email, password, no_rekening];
+            break;
+        default: return res.status(400).send('Invalid role');
     }
-    next();
-};
-
-// 10. API Routes
-
-// === AUTHENTICATION ROUTES ===
-app.post('/api/login', authLimiter, validateRequired(['role', 'email', 'password']), asyncHandler(async (req, res) => {
-    const { role, email, password } = req.body;
-
-    // Validate role
-    const validRoles = ['pelanggan', 'supplier', 'admin'];
-    if (!validRoles.includes(role)) {
-        return res.status(400).json({ message: 'Role tidak valid' });
-    }
-
-    const table = role === 'pelanggan' ? 'pelanggan' :
-        role === 'supplier' ? 'supplier' : 'admin';
-
-    const idField = role === 'pelanggan' ? 'id_pelanggan' :
-        role === 'supplier' ? 'id_supplier' : 'id_admin';
-
-    const connection = await dbPool.getConnection();
-    try {
-        const [rows] = await connection.execute(
-            `SELECT ${idField} as id, nama, email, password FROM ${table} WHERE email = ?`,
-            [email]
-        );
-
-        if (rows.length === 0) {
-            return res.status(401).json({ message: 'Email atau password salah' });
-        }
-
-        const user = rows[0];
-        const isValidPassword = await bcrypt.compare(password, user.password);
-
-        if (!isValidPassword) {
-            return res.status(401).json({ message: 'Email atau password salah' });
-        }
-
-        res.status(200).json({
-            message: 'Login berhasil!',
-            user: {
-                id: user.id,
-                nama: user.nama,
-                email: user.email,
-                role: role
+    const query = `INSERT INTO ${tableName} (${fields.join(', ')}) VALUES (?${', ?'.repeat(fields.length - 1)})`;
+    db.query(query, values, (err, result) => {
+        if (err) {
+            console.error('Error saat menjalankan query registrasi:', err);
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).send('NIK atau Email ini sudah terdaftar.');
             }
-        });
-
-    } finally {
-        connection.release();
-    }
-}));
-
-app.post('/api/register/pelanggan', validateRequired(['nik', 'nama', 'alamat', 'no_telp', 'email', 'password']), asyncHandler(async (req, res) => {
-    const { nik, nama, alamat, no_telp, email, password } = req.body;
-
-    // Validate password strength (minimal 6 karakter)
-    if (password.length < 6) {
-        return res.status(400).json({ message: 'Password minimal 6 karakter' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const connection = await dbPool.getConnection();
-
-    try {
-        await connection.execute(
-            "INSERT INTO pelanggan (nik, nama, alamat, no_telp, email, password) VALUES (?, ?, ?, ?, ?, ?)",
-            [nik, nama, alamat, no_telp, email, hashedPassword]
-        );
-
-        res.status(201).json({ message: 'Registrasi pelanggan berhasil!' });
-
-    } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ message: 'Email atau NIK sudah terdaftar' });
+            return res.status(500).send('Terjadi masalah pada server saat registrasi.');
         }
-        throw error;
-    } finally {
-        connection.release();
+        res.status(201).send('Registrasi berhasil! Anda akan diarahkan ke halaman login.');
+    });
+});
+
+app.post('/login', (req, res) => {
+    const { email, password, role } = req.body;
+    let tableName, id_field;
+    switch (role) {
+        case 'pelanggan': tableName = 'pelanggan'; id_field = 'nik'; break;
+        case 'supplier': tableName = 'supplier'; id_field = 'id_supplier'; break;
+        case 'admin': tableName = 'admin'; id_field = 'id_admin'; break;
+        default: return res.status(400).send('Invalid role');
     }
-}));
-
-app.post('/api/register/supplier', validateRequired(['nama', 'alamat', 'no_telp', 'email', 'password', 'no_rekening']), asyncHandler(async (req, res) => {
-    const { nama, alamat, no_telp, email, password, no_rekening } = req.body;
-
-    if (password.length < 6) {
-        return res.status(400).json({ message: 'Password minimal 6 karakter' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const connection = await dbPool.getConnection();
-
-    try {
-        await connection.execute(
-            "INSERT INTO supplier (nama, alamat, no_telp, email, password, no_rekening) VALUES (?, ?, ?, ?, ?, ?)",
-            [nama, alamat, no_telp, email, hashedPassword, no_rekening]
-        );
-
-        res.status(201).json({ message: 'Registrasi supplier berhasil!' });
-
-    } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ message: 'Email sudah terdaftar' });
+    const query = `SELECT * FROM ${tableName} WHERE email = ? AND password = ?`;
+    db.query(query, [email, password], (err, results) => {
+        if (err) return res.status(500).send('Server error');
+        if (results.length > 0) {
+            req.session.user = { id: results[0][id_field], nama: results[0].nama, email: results[0].email, role: role };
+            res.json({ success: true, user: req.session.user });
+        } else {
+            res.status(401).json({ success: false, message: 'Email atau password salah' });
         }
-        throw error;
-    } finally {
-        connection.release();
-    }
-}));
+    });
+});
 
-// === MOBIL ROUTES ===
-app.get('/api/mobil', asyncHandler(async (req, res) => {
-    const connection = await dbPool.getConnection();
-    try {
-        const [rows] = await connection.execute(
-            "SELECT id_mobil, merk, tipe, tahun, tarif_per_hari, foto FROM mobil WHERE status_mobil = 'tersedia' ORDER BY id_mobil DESC"
-        );
-        res.json(rows);
-    } finally {
-        connection.release();
-    }
-}));
+app.get('/api/mobil', (req, res) => {
+    const query = "SELECT * FROM mobil WHERE status_mobil = 'tersedia'";
+    db.query(query, (err, results) => {
+        if (err) return res.status(500).send('Server error');
+        res.json(results);
+    });
+});
 
-app.get('/api/mobil/:id', asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const connection = await dbPool.getConnection();
+app.get('/api/mobil/:id', (req, res) => {
+    const query = 'SELECT * FROM mobil WHERE id_mobil = ?';
+    db.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).send('Server error');
+        res.json(result[0]);
+    });
+});
 
-    try {
-        const [rows] = await connection.execute(
-            'SELECT * FROM mobil WHERE id_mobil = ?',
-            [id]
-        );
 
-        if (rows.length === 0) {
-            return res.status(404).json({ message: 'Mobil tidak ditemukan' });
+// ================= RUTE-RUTE BARU UNTUK ADMIN.JS =================
+
+// 1. RUTE BARU: Mengambil semua data booking untuk ditampilkan di dashboard admin
+app.get('/api/bookings', (req, res) => {
+    const query = `
+        SELECT 
+            b.id_booking,
+            pel.nama AS nama_pelanggan,
+            m.merk,
+            m.tipe,
+            b.tanggal_mulai,
+            b.tanggal_selesai,
+            b.status_booking,
+            p.bukti_pembayaran
+        FROM booking b
+        JOIN pelanggan pel ON b.nik = pel.nik
+        JOIN mobil m ON b.id_mobil = m.id_mobil
+        LEFT JOIN pembayaran p ON b.id_booking = p.id_booking
+        ORDER BY b.id_booking DESC;
+    `;
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("Error fetching all bookings:", err);
+            return res.status(500).json({ message: "Gagal mengambil data pesanan." });
         }
+        res.json(results);
+    });
+});
 
-        res.json(rows[0]);
-    } finally {
-        connection.release();
-    }
-}));
-
-// === BOOKING ROUTES WITH RACE CONDITION PREVENTION ===
-app.post('/api/booking', validateRequired(['nik', 'id_mobil', 'tanggal_mulai', 'tanggal_selesai']), asyncHandler(async (req, res) => {
-    const { nik, id_mobil, tanggal_mulai, tanggal_selesai } = req.body;
-
-    // Validate dates
-    const startDate = new Date(tanggal_mulai);
-    const endDate = new Date(tanggal_selesai);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (startDate < today) {
-        return res.status(400).json({ message: 'Tanggal mulai tidak boleh kurang dari hari ini' });
-    }
-
-    if (endDate <= startDate) {
-        return res.status(400).json({ message: 'Tanggal selesai harus setelah tanggal mulai' });
-    }
-
-    const connection = await dbPool.getConnection();
-
-    try {
-        await connection.beginTransaction();
-
-        // Lock the car row to prevent race conditions
-        const [carRows] = await connection.execute(
-            'SELECT id_mobil, tarif_per_hari, status_mobil FROM mobil WHERE id_mobil = ? FOR UPDATE',
-            [id_mobil]
-        );
-
-        if (carRows.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: 'Mobil tidak ditemukan' });
+// 2. RUTE BARU: Mengambil daftar mobil yang menunggu verifikasi
+app.get('/api/pendaftaran-mobil/pending', (req, res) => {
+    const query = `
+        SELECT 
+            pm.id_pendaftaran,
+            pm.merk,
+            pm.tipe,
+            pm.tahun,
+            pm.tarif_per_hari,
+            pm.foto,
+            s.nama AS nama_supplier 
+        FROM pendaftaran_mobil pm
+        JOIN supplier s ON pm.id_supplier = s.id_supplier
+        WHERE pm.status_verifikasi = 'menunggu'
+        ORDER BY pm.tanggal_daftar ASC;
+    `;
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error("Error fetching pending cars:", err);
+            return res.status(500).json({ message: "Gagal memuat data verifikasi." });
         }
+        res.json(results);
+    });
+});
 
-        const car = carRows[0];
-        if (car.status_mobil !== 'tersedia') {
-            await connection.rollback();
-            return res.status(409).json({ message: 'Mobil tidak tersedia' });
-        }
-
-        // Check for overlapping bookings
-        const [overlappingBookings] = await connection.execute(
-            `SELECT id_booking FROM booking 
-             WHERE id_mobil = ? 
-             AND status_booking NOT IN ('dibatalkan', 'selesai')
-             AND (
-                 (tanggal_mulai <= ? AND tanggal_selesai >= ?) OR
-                 (tanggal_mulai <= ? AND tanggal_selesai >= ?) OR
-                 (tanggal_mulai >= ? AND tanggal_selesai <= ?)
-             )`,
-            [id_mobil, tanggal_mulai, tanggal_mulai, tanggal_selesai, tanggal_selesai, tanggal_mulai, tanggal_selesai]
-        );
-
-        if (overlappingBookings.length > 0) {
-            await connection.rollback();
-            return res.status(409).json({ message: 'Mobil sudah dibooking untuk tanggal tersebut' });
-        }
-
-        // Calculate total cost
-        const [durationRows] = await connection.execute(
-            'SELECT DATEDIFF(?, ?) AS durasi',
-            [tanggal_selesai, tanggal_mulai]
-        );
-
-        const duration = durationRows[0].durasi;
-        const totalCost = duration * car.tarif_per_hari;
-
-        // Insert booking
-        const [result] = await connection.execute(
-            'INSERT INTO booking (nik, id_mobil, tanggal_mulai, tanggal_selesai, total_biaya, status_booking) VALUES (?, ?, ?, ?, ?, ?)',
-            [nik, id_mobil, tanggal_mulai, tanggal_selesai, totalCost, 'menunggu pembayaran']
-        );
-
-        await connection.commit();
-
-        res.status(201).json({
-            message: 'Booking berhasil dibuat!',
-            bookingId: result.insertId,
-            totalBiaya: totalCost
-        });
-
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
-    }
-}));
-
-// === PAYMENT ROUTES ===
-app.post('/api/pembayaran', upload.single('bukti_pembayaran'), validateRequired(['id_booking']), asyncHandler(async (req, res) => {
-    const { id_booking } = req.body;
-
-    if (!req.file) {
-        return res.status(400).json({ message: 'Bukti pembayaran diperlukan' });
+// 3. RUTE BARU: Untuk admin mengonfirmasi atau menyelesaikan booking
+app.post('/api/booking/confirm', (req, res) => {
+    // Pastikan admin sudah login
+    if (!req.session.user || req.session.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Akses ditolak.' });
     }
 
-    const buktiPath = `uploads/${req.file.filename}`;
-    const connection = await dbPool.getConnection();
-
-    try {
-        await connection.beginTransaction();
-
-        // Check if booking exists and is waiting for payment
-        const [bookingRows] = await connection.execute(
-            'SELECT id_booking, status_booking FROM booking WHERE id_booking = ? FOR UPDATE',
-            [id_booking]
-        );
-
-        if (bookingRows.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: 'Booking tidak ditemukan' });
-        }
-
-        if (bookingRows[0].status_booking !== 'menunggu pembayaran') {
-            await connection.rollback();
-            return res.status(400).json({ message: 'Booking tidak dalam status menunggu pembayaran' });
-        }
-
-        // Insert payment record
-        await connection.execute(
-            "INSERT INTO pembayaran (id_booking, metode, bukti_pembayaran, status_pembayaran) VALUES (?, ?, ?, ?)",
-            [id_booking, 'Transfer Bank', buktiPath, 'menunggu verifikasi']
-        );
-
-        // Update booking status
-        await connection.execute(
-            "UPDATE booking SET status_booking = 'menunggu verifikasi' WHERE id_booking = ?",
-            [id_booking]
-        );
-
-        await connection.commit();
-
-        res.status(201).json({ message: 'Pembayaran berhasil diupload dan menunggu verifikasi!' });
-
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
+    const { id_booking, status } = req.body;
+    if (!id_booking || !status) {
+        return res.status(400).json({ message: 'Informasi tidak lengkap.' });
     }
-}));
 
-// === ADMIN ROUTES ===
-app.get('/api/pendaftaran-mobil/pending', asyncHandler(async (req, res) => {
-    const connection = await dbPool.getConnection();
-    try {
-        const [rows] = await connection.execute(
-            `SELECT p.*, s.nama AS nama_supplier
-             FROM pendaftaran_mobil p
-             JOIN supplier s ON p.id_supplier = s.id_supplier
-             WHERE p.status_verifikasi = 'menunggu'
-             ORDER BY p.tanggal_daftar ASC`
-        );
-        res.json(rows);
-    } finally {
-        connection.release();
+    // Panggil stored procedure yang sudah ada
+    db.query('CALL konfirmasi_booking(?, ?)', [id_booking, status], (err, result) => {
+        if (err) {
+            console.error("Error confirming booking:", err);
+            return res.status(500).json({ message: "Gagal mengonfirmasi pesanan." });
+        }
+        res.json({ message: `Pesanan #${id_booking} berhasil diubah statusnya menjadi '${status}'.` });
+    });
+});
+
+// 4. RUTE BARU: Untuk admin menyetujui atau menolak pendaftaran mobil
+app.post('/api/pendaftaran-mobil/verify', (req, res) => {
+    // Pastikan admin sudah login
+    if (!req.session.user || req.session.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Akses ditolak.' });
     }
-}));
 
-app.post('/api/pendaftaran-mobil/verify', validateRequired(['pendaftaran_id', 'action']), asyncHandler(async (req, res) => {
     const { pendaftaran_id, action, catatan } = req.body;
-    const admin_id = 1; // Should come from authentication
+    const admin_id = req.session.user.id;
 
     if (!['diterima', 'ditolak'].includes(action)) {
-        return res.status(400).json({ message: 'Action harus "diterima" atau "ditolak"' });
+        return res.status(400).json({ message: 'Aksi tidak valid.' });
     }
 
-    const connection = await dbPool.getConnection();
+    // Update status pendaftaran
+    const updateQuery = 'UPDATE pendaftaran_mobil SET status_verifikasi = ?, catatan_verifikasi = ?, id_admin = ? WHERE id_pendaftaran = ?';
+    db.query(updateQuery, [action, catatan, admin_id, pendaftaran_id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Gagal update status pendaftaran.' });
 
-    try {
-        await connection.beginTransaction();
-
-        // Get pendaftaran data
-        const [pendaftaranRows] = await connection.execute(
-            "SELECT * FROM pendaftaran_mobil WHERE id_pendaftaran = ? AND status_verifikasi = 'menunggu'",
-            [pendaftaran_id]
-        );
-
-        if (pendaftaranRows.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: 'Pendaftaran tidak ditemukan atau sudah diverifikasi' });
-        }
-
-        const pendaftaran = pendaftaranRows[0];
-
-        // Update pendaftaran status
-        await connection.execute(
-            "UPDATE pendaftaran_mobil SET status_verifikasi = ?, catatan_verifikasi = ?, id_admin = ?, tanggal_verifikasi = NOW() WHERE id_pendaftaran = ?",
-            [action, catatan, admin_id, pendaftaran_id]
-        );
-
-        // If approved, add to mobil table
+        // Jika diterima, masukkan data ke tabel mobil
         if (action === 'diterima') {
-            await connection.execute(
-                `INSERT INTO mobil (id_supplier, merk, tipe, tahun, tarif_per_hari, foto, status_mobil) 
-                 VALUES (?, ?, ?, ?, ?, ?, 'tersedia')`,
-                [pendaftaran.id_supplier, pendaftaran.merk, pendaftaran.tipe, pendaftaran.tahun, pendaftaran.tarif_per_hari, pendaftaran.foto]
-            );
+            const getPendaftaranQuery = 'SELECT * FROM pendaftaran_mobil WHERE id_pendaftaran = ?';
+            db.query(getPendaftaranQuery, [pendaftaran_id], (err, pendaftaran) => {
+                if (err || pendaftaran.length === 0) return res.status(500).json({ message: 'Gagal mengambil data pendaftaran.' });
+
+                const car = pendaftaran[0];
+                const insertMobilQuery = 'INSERT INTO mobil (id_supplier, merk, tipe, tahun, tarif_per_hari, foto) VALUES (?, ?, ?, ?, ?, ?)';
+                db.query(insertMobilQuery, [car.id_supplier, car.merk, car.tipe, car.tahun, car.tarif_per_hari, car.foto], (err, insertResult) => {
+                    if (err) return res.status(500).json({ message: 'Gagal memasukkan mobil ke daftar.' });
+                    res.json({ message: `Pendaftaran #${pendaftaran_id} disetujui dan mobil telah ditambahkan.` });
+                });
+            });
+        } else {
+            // Jika ditolak
+            res.json({ message: `Pendaftaran #${pendaftaran_id} telah ditolak.` });
         }
-
-        await connection.commit();
-
-        res.json({ message: `Pendaftaran mobil #${pendaftaran_id} telah ${action}` });
-
-    } catch (error) {
-        await connection.rollback();
-        throw error;
-    } finally {
-        connection.release();
-    }
-}));
-
-// === SUPPLIER ROUTES ===
-app.post('/api/pendaftaran-mobil', upload.single('foto'), validateRequired(['id_supplier', 'merk', 'tipe', 'tahun', 'tarif_per_hari']), asyncHandler(async (req, res) => {
-    const { id_supplier, merk, tipe, tahun, tarif_per_hari } = req.body;
-
-    if (!req.file) {
-        return res.status(400).json({ message: 'Foto mobil diperlukan' });
-    }
-
-    const foto = `uploads/${req.file.filename}`;
-    const connection = await dbPool.getConnection();
-
-    try {
-        await connection.execute(
-            `INSERT INTO pendaftaran_mobil (id_supplier, merk, tipe, tahun, tarif_per_hari, foto, status_verifikasi, tanggal_daftar) 
-             VALUES (?, ?, ?, ?, ?, ?, 'menunggu', NOW())`,
-            [id_supplier, merk, tipe, tahun, tarif_per_hari, foto]
-        );
-
-        res.status(201).json({ message: 'Pendaftaran mobil berhasil diajukan dan menunggu verifikasi admin' });
-
-    } finally {
-        connection.release();
-    }
-}));
-
-// === ERROR HANDLING MIDDLEWARE ===
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-
-    if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ message: 'File terlalu besar (maksimal 5MB)' });
-        }
-    }
-
-    if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ message: 'Data sudah ada' });
-    }
-
-    res.status(500).json({
-        message: 'Terjadi kesalahan pada server',
-        error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
 });
 
-// === STATIC FILE SERVING ===
-// Serve static files (harus di akhir setelah semua API routes)
-app.get('*', (req, res) => {
-    // Only serve index.html for non-API routes
-    if (!req.path.startsWith('/api/')) {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    } else {
-        res.status(404).json({ message: 'API endpoint tidak ditemukan' });
-    }
+// ================= AKHIR DARI RUTE BARU =================
+
+
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
 });
-
-// === SERVER STARTUP ===
-const server = app.listen(PORT, () => {
-    console.log(`🚀 Server CarsHub berjalan di http://localhost:${PORT}`);
-    console.log(`📁 Serving static files from: ${path.join(__dirname, 'public')}`);
-});
-
-// === GRACEFUL SHUTDOWN ===
-const gracefulShutdown = () => {
-    console.log('\n🔄 Shutting down gracefully...');
-
-    server.close(() => {
-        console.log('✅ HTTP server closed');
-
-        dbPool.end(() => {
-            console.log('✅ Database pool closed');
-            process.exit(0);
-        });
-    });
-
-    // Force close after 30 seconds
-    setTimeout(() => {
-        console.error('❌ Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 30000);
-};
-
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    gracefulShutdown();
-});
-
-module.exports = app;

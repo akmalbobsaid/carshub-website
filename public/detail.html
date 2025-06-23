@@ -4,35 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Mobil - CarsHub</title>
-    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <header>
-        <h1>Detail & Booking Mobil</h1>
-    </header>
-
-    <main>
-        <div id="car-detail-container">
-            <p>Memuat detail mobil...</p>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <i class="fas fa-car"></i>
+                CarsHub
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html#home">Beranda</a></li>
+                <li><a href="index.html#cars">Mobil</a></li>
+                <li><a href="index.html#about">Tentang</a></li>
+                <li><a href="index.html#contact">Kontak</a></li>
+            </ul>
+            <div class="nav-auth">
+                <a href="login.html" class="btn btn-outline">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Masuk
+                </a>
+                <a href="register.html" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i>
+                    Daftar
+                </a>
+            </div>
         </div>
+    </nav>
 
-        <hr style="margin: 2rem 0;">
+    <!-- Hero Section -->
+    <section class="hero" id="home" style="padding: 120px 0 40px;">
+        <div class="hero-content">
+            <h1 style="font-size: 2.5rem;">Detail Mobil</h1>
+            <p>Informasi lengkap tentang mobil pilihan Anda</p>
+        </div>
+    </section>
 
-        <h2>Formulir Booking</h2>
-        <form id="booking-form">
-            <div>
-                <label for="tanggal_mulai">Tanggal Mulai Sewa:</label>
-                <input type="date" id="tanggal_mulai" name="tanggal_mulai" required>
+    <!-- Car Detail Section -->
+    <section class="cars-section" style="padding: 40px 0 80px;">
+        <div class="container">
+            <div id="car-detail-container" class="loading-state">
+                <div class="loading-spinner"></div>
+                <p>Memuat detail mobil...</p>
             </div>
-            <br>
-            <div>
-                <label for="tanggal_selesai">Tanggal Selesai Sewa:</label>
-                <input type="date" id="tanggal_selesai" name="tanggal_selesai" required>
+        </div>
+    </section>
+
+    <!-- Booking Section -->
+    <section style="background: white; padding: 80px 0;">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Formulir Booking</h2>
+                <p class="section-subtitle">Lengkapi informasi booking Anda untuk melanjutkan ke pembayaran</p>
             </div>
-            <br>
-            <button type="submit">Booking Sekarang</button>
-        </form>
-    </main>
+
+            <div class="search-section" style="margin: 0 auto;">
+                <form id="booking-form" class="search-form">
+                    <div class="form-group">
+                        <label for="tanggal_mulai">Tanggal Mulai Sewa</label>
+                        <input type="date" id="tanggal_mulai" name="tanggal_mulai" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tanggal_selesai">Tanggal Selesai Sewa</label>
+                        <input type="date" id="tanggal_selesai" name="tanggal_selesai" class="form-input" required>
+                    </div>
+                    <!--<div class="form-group">
+                        <label for="catatan">Catatan (Opsional)</label>
+                        <input type="text" id="catatan" name="catatan" class="form-input" placeholder="Catatan khusus...">
+                    </div>-->
+                    <button type="submit" class="btn btn-primary" style="height: fit-content;">
+                        <i class="fas fa-calendar-check"></i>
+                        Booking Sekarang
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
 
     <script src="detail.js"></script>
 </body>
