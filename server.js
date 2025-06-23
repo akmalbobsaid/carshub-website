@@ -1,4 +1,4 @@
-﻿// server.js - Versi Lengkap dengan Rute untuk Admin
+﻿// server.js - Versi Final yang Lengkap
 
 const express = require('express');
 const mysql = require('mysql2');
@@ -127,6 +127,59 @@ app.get('/api/mobil/:id', (req, res) => {
     });
 });
 
+// --- RUTE SUPPLIER ---
+
+// ** INI RUTE YANG HILANG DAN SEKARANG SUDAH DITAMBAHKAN **
+app.get('/api/supplier/mobil', (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'supplier') {
+        return res.status(403).json([]);
+    }
+    const id_supplier = req.session.user.id;
+    const query = "SELECT * FROM mobil WHERE id_supplier = ?";
+    db.query(query, [id_supplier], (err, results) => {
+        if (err) {
+            console.error('Error fetching supplier cars:', err);
+            return res.status(500).send('Server error');
+        }
+        res.json(results);
+    });
+});
+
+app.post('/api/pendaftaran_mobil', upload.single('foto'), (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'supplier') {
+        return res.status(403).send('Akses ditolak: Anda harus login sebagai supplier.');
+    }
+    const id_supplier = req.session.user.id;
+    const { merk, tipe, tahun, tarif_per_hari } = req.body;
+    const foto = req.file ? `/uploads/${req.file.filename}` : null;
+    if (!foto) return res.status(400).send('Foto mobil diperlukan.');
+
+    const query = 'INSERT INTO pendaftaran_mobil (id_supplier, merk, tipe, tahun, tarif_per_hari, foto) VALUES (?, ?, ?, ?, ?, ?)';
+    db.query(query, [id_supplier, merk, tipe, tahun, tarif_per_hari, foto], (err, result) => {
+        if (err) {
+            console.error('Error submitting car registration:', err);
+            return res.status(500).send('Server error');
+        }
+        res.status(201).send('Pendaftaran mobil berhasil, menunggu verifikasi admin.');
+    });
+});
+
+app.get('/api/supplier/reports', (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'supplier') {
+        return res.status(403).json({ message: 'Akses ditolak.' });
+    }
+    const id_supplier = req.session.user.id;
+    const { year } = req.query;
+    if (!year) return res.status(400).json({ message: 'Tahun diperlukan.' });
+
+    db.query('CALL laporan_komisi_bulanan(?, ?)', [id_supplier, year], (err, results) => {
+        if (err) {
+            console.error("Error fetching monthly commission report:", err);
+            return res.status(500).json({ message: 'Gagal mengambil laporan.' });
+        }
+        res.json(results[0]);
+    });
+});
 
 // ================= RUTE-RUTE BARU UNTUK ADMIN.JS =================
 

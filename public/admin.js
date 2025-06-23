@@ -1,56 +1,75 @@
-// public/admin.js - Versi Lengkap dengan Toggle
+// public/admin.js - Versi Baru dengan Pengecekan Login
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Ambil elemen-elemen untuk toggle
-    const bookingsToggle = document.getElementById('bookings-toggle');
-    const verificationToggle = document.getElementById('verification-toggle');
-    const bookingsView = document.getElementById('bookings-view');
-    const verificationView = document.getElementById('verification-view');
-    
-    // Muat semua data saat halaman pertama kali dibuka, agar siap saat di-toggle
-    fetchAllBookings();
-    fetchPendingCars();
+    // Fungsi utama yang akan dijalankan HANYA SETELAH admin terverifikasi
+    function initializeAdminDashboard() {
+        // Ambil elemen-elemen dashboard
+        const dashboardContent = document.getElementById('dashboard-content');
+        const bookingsToggle = document.getElementById('bookings-toggle');
+        const verificationToggle = document.getElementById('verification-toggle');
+        const bookingsView = document.getElementById('bookings-view');
+        const verificationView = document.getElementById('verification-view');
 
-    // Event listener untuk tombol "Manajemen Pesanan"
-    bookingsToggle.addEventListener('click', () => {
-        // Atur kelas 'active' pada tombol
-        bookingsToggle.classList.add('active');
-        verificationToggle.classList.remove('active');
+        // Tampilkan konten dashboard
+        dashboardContent.style.display = 'block';
 
-        // Tampilkan tabel pesanan dan sembunyikan tabel verifikasi
-        bookingsView.classList.add('active');
-        verificationView.classList.remove('active');
-    });
+        // Muat data awal
+        fetchAllBookings();
+        fetchPendingCars();
 
-    // Event listener untuk tombol "Verifikasi Mobil"
-    verificationToggle.addEventListener('click', () => {
-        // Atur kelas 'active' pada tombol
-        verificationToggle.classList.add('active');
-        bookingsToggle.classList.remove('active');
+        // Pasang event listener untuk tombol toggle
+        bookingsToggle.addEventListener('click', () => {
+            bookingsToggle.classList.add('active');
+            verificationToggle.classList.remove('active');
+            bookingsView.classList.add('active');
+            verificationView.classList.remove('active');
+        });
 
-        // Tampilkan tabel verifikasi dan sembunyikan tabel pesanan
-        verificationView.classList.add('active');
-        bookingsView.classList.remove('active');
-    });
+        verificationToggle.addEventListener('click', () => {
+            verificationToggle.classList.add('active');
+            bookingsToggle.classList.remove('active');
+            verificationView.classList.add('active');
+            bookingsView.classList.remove('active');
+        });
+    }
+
+    // Tunggu dan periksa status login dari auth.js
+    const checkAuthInterval = setInterval(() => {
+        // window.currentUser disediakan oleh auth.js
+        if (window.currentUser) {
+            clearInterval(checkAuthInterval);
+            if (window.currentUser.role === 'admin') {
+                // Jika yang login adalah admin, jalankan dashboard
+                initializeAdminDashboard();
+            } else {
+                // Jika yang login bukan admin, tolak akses
+                alert('Akses ditolak. Hanya admin yang dapat mengakses halaman ini.');
+                window.location.href = '/index.html';
+            }
+        } else if (window.currentUser === null) {
+            // Jika auth.js sudah selesai dan hasilnya tidak ada yang login
+            clearInterval(checkAuthInterval);
+            // Biarkan halaman menampilkan form login saja, jangan lakukan apa-apa
+            console.log("Menunggu admin untuk login...");
+        }
+    }, 100); // Cek setiap 100ms
 });
 
 
-// === FUNGSI-FUNGSI UNTUK MANAJEMEN PESANAN ===
+// === FUNGSI-FUNGSI API (TIDAK BERUBAH, HANYA DIPANGGIL SETELAH LOGIN) ===
 
-// Fungsi untuk mengambil SEMUA data booking dari server
 async function fetchAllBookings() {
     const tbody = document.getElementById('bookings-tbody');
+    tbody.innerHTML = '<tr><td colspan="8">Memuat data pesanan...</td></tr>';
     try {
         const response = await fetch('/api/bookings');
         if (!response.ok) throw new Error('Gagal mengambil data pesanan.');
-        
         const bookings = await response.json();
-        tbody.innerHTML = ''; // Kosongkan tabel sebelum diisi
+        tbody.innerHTML = '';
         if (bookings.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8">Belum ada data pesanan.</td></tr>';
             return;
         }
-
         bookings.forEach(booking => {
             const row = tbody.insertRow();
             row.innerHTML = `
@@ -63,32 +82,25 @@ async function fetchAllBookings() {
                 <td class="proof-cell"></td>
                 <td class="actions-cell"></td>
             `;
-
-            // Tampilkan link bukti pembayaran jika ada
             const proofCell = row.querySelector('.proof-cell');
             if (booking.bukti_pembayaran) {
-                const correctedPath = booking.bukti_pembayaran.replace('public/', '');
-                proofCell.innerHTML = `<a href="/${correctedPath}" target="_blank">Lihat Bukti</a>`;
+                proofCell.innerHTML = `<a href="/${booking.bukti_pembayaran}" target="_blank">Lihat Bukti</a>`;
             } else {
                 proofCell.textContent = '-';
             }
-
-            // Tambahkan tombol aksi berdasarkan status booking
             const actionsCell = row.querySelector('.actions-cell');
-            if (booking.status_booking === 'menunggu pembayaran' && booking.bukti_pembayaran) {
-                const verifyButton = document.createElement('button');
-                verifyButton.textContent = 'Verifikasi Pembayaran';
-                verifyButton.className = 'action-button btn-verify';
-                verifyButton.onclick = () => confirmBooking(booking.id_booking, 'berlangsung', 'verifikasi pembayaran');
-                actionsCell.appendChild(verifyButton);
+            if (booking.status_booking === 'menunggu verifikasi') {
+                const button = document.createElement('button');
+                button.textContent = 'Verifikasi Bayar';
+                button.className = 'btn btn-info btn-sm';
+                button.onclick = () => confirmBooking(booking.id_booking, 'berlangsung', 'verifikasi pembayaran');
+                actionsCell.appendChild(button);
             } else if (booking.status_booking === 'berlangsung') {
-                const completeButton = document.createElement('button');
-                completeButton.textContent = 'Selesaikan Pesanan';
-                completeButton.className = 'action-button btn-complete';
-                completeButton.onclick = () => confirmBooking(booking.id_booking, 'selesai', 'menyelesaikan pesanan');
-                actionsCell.appendChild(completeButton);
-            } else {
-                actionsCell.textContent = '-';
+                const button = document.createElement('button');
+                button.textContent = 'Selesaikan';
+                button.className = 'btn btn-success btn-sm';
+                button.onclick = () => confirmBooking(booking.id_booking, 'selesai', 'menyelesaikan pesanan');
+                actionsCell.appendChild(button);
             }
         });
     } catch (error) {
@@ -96,11 +108,8 @@ async function fetchAllBookings() {
     }
 }
 
-// Fungsi untuk menangani aksi konfirmasi booking (Berlangsung/Selesai)
 async function confirmBooking(bookingId, newStatus, actionType) {
-    if (!confirm(`Anda yakin ingin ${actionType} untuk pesanan #${bookingId}?`)) {
-        return;
-    }
+    if (!confirm(`Anda yakin ingin ${actionType} untuk pesanan #${bookingId}?`)) return;
     try {
         const response = await fetch('/api/booking/confirm', {
             method: 'POST',
@@ -110,64 +119,52 @@ async function confirmBooking(bookingId, newStatus, actionType) {
         const result = await response.json();
         if (!response.ok) throw new Error(result.message);
         alert(result.message);
-        fetchAllBookings(); // Muat ulang data tabel pesanan
+        fetchAllBookings();
     } catch (error) {
         alert(`Error: ${error.message}`);
     }
 }
 
-
-// === FUNGSI-FUNGSI UNTUK VERIFIKASI MOBIL ===
-
-// Fungsi untuk mengambil mobil yang menunggu verifikasi dari server
 async function fetchPendingCars() {
     const tbody = document.getElementById('pending-cars-tbody');
+    tbody.innerHTML = '<tr><td colspan="7">Memuat data verifikasi...</td></tr>';
     try {
         const response = await fetch('/api/pendaftaran-mobil/pending');
+        if (!response.ok) throw new Error('Gagal memuat data verifikasi.');
         const cars = await response.json();
         tbody.innerHTML = '';
         if (cars.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">Tidak ada pendaftaran mobil baru yang menunggu verifikasi.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">Tidak ada pendaftaran mobil baru.</td></tr>';
             return;
         }
-
         cars.forEach(car => {
             const row = tbody.insertRow();
-            const correctedPath = car.foto.replace('public/', '');
             row.innerHTML = `
                 <td>${car.id_pendaftaran}</td>
                 <td>${car.nama_supplier}</td>
                 <td>${car.merk} ${car.tipe}</td>
                 <td>${car.tahun}</td>
                 <td>${new Intl.NumberFormat('id-ID').format(car.tarif_per_hari)}</td>
-                <td><a href="/${correctedPath}" target="_blank">Lihat Foto</a></td>
+                <td><a href="/${car.foto}" target="_blank">Lihat Foto</a></td>
                 <td>
-                    <button class="action-button btn-approve" onclick="handleVerification(${car.id_pendaftaran}, 'diterima')">Setujui</button>
-                    <button class="action-button btn-reject" onclick="handleVerification(${car.id_pendaftaran}, 'ditolak')">Tolak</button>
+                    <button class="btn btn-success btn-sm" onclick="handleVerification(${car.id_pendaftaran}, 'diterima')">Setujui</button>
+                    <button class="btn btn-danger btn-sm" onclick="handleVerification(${car.id_pendaftaran}, 'ditolak')">Tolak</button>
                 </td>
             `;
         });
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="7">Gagal memuat data verifikasi: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
     }
 }
 
-// Fungsi untuk menangani aksi verifikasi (Setujui/Tolak)
 async function handleVerification(pendaftaranId, action) {
     let catatan = 'Disetujui oleh admin.';
-    
     if (action === 'ditolak') {
-        catatan = prompt("Harap masukkan alasan penolakan:");
-        if (catatan === null || catatan.trim() === "") {
-            alert("Aksi dibatalkan. Alasan penolakan tidak boleh kosong.");
-            return;
-        }
+        catatan = prompt("Masukkan alasan penolakan:");
+        if (catatan === null || catatan.trim() === "") return alert("Aksi dibatalkan.");
     } else {
-        if (!confirm(`Anda yakin ingin MENYETUJUI pendaftaran mobil #${pendaftaranId}? Mobil akan langsung tersedia untuk disewa.`)) {
-            return;
-        }
+        if (!confirm(`Anda yakin ingin MENYETUJUI pendaftaran #${pendaftaranId}?`)) return;
     }
-
     try {
         const response = await fetch('/api/pendaftaran-mobil/verify', {
             method: 'POST',
@@ -177,7 +174,7 @@ async function handleVerification(pendaftaranId, action) {
         const result = await response.json();
         if (!response.ok) throw new Error(result.message);
         alert(result.message);
-        fetchPendingCars(); // Muat ulang daftar verifikasi
+        fetchPendingCars();
     } catch (error) {
         alert(`Error: ${error.message}`);
     }
